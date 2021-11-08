@@ -1,0 +1,77 @@
+service: sls-brownbag-users
+
+frameworkVersion: '2'
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  lambdaHashingVersion: 20201221
+  region: eu-central-1
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:DeleteItem
+        - dynamodb:ListStream
+        - dynamodb:DescribeTable
+        - dynamodb:DescribeStream
+      Resource: "*"
+
+functions:
+  create:
+    handler: users/create.create
+    events:
+      - httpApi:
+          path: /create
+          method: post
+  findOne:
+    handler: users/findOne.findOne
+    events:
+      - httpApi:
+          path: /find/{id}
+          method: get
+  findAll:
+    handler: users/findAll.findAll
+    events:
+      - httpApi:
+          path: /find
+          method: get
+  deleteAll:
+    handler: users/deleteAll.deleteAll
+    events:
+      - schedule:
+          rate: rate(1 minute)
+          enabled: true
+  new:
+    handler: users/new.new
+    events:
+      - stream:
+          type: dynamodb
+          batchSize: 1
+          startingPosition: LATEST
+          arn:
+            Fn::GetAtt:
+              - UsersTable
+              - StreamArn
+
+
+
+resources:
+  Resources:
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: users-table
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        StreamSpecification:
+          StreamViewType: NEW_IMAGE
